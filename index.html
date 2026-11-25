@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tenochtitlan – 3D-Welt</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #87b9cf; font: 16px sans-serif; }
+    #hinweis {
+      position: fixed; top: 12px; left: 12px; color: white;
+      background: #17251dcc; padding: 10px 14px; border-radius: 8px;
+    }
+    #start {
+      position: fixed; inset: 0; display: grid; place-items: center;
+      background: #101b22aa; color: white; text-align: center; cursor: pointer;
+    }
+    #start div { background: #203b35; padding: 20px 28px; border-radius: 12px; }
+  </style>
+</head>
+<body>
+  <div id="hinweis">WASD: bewegen · Maus: umsehen · Esc: Maus lösen</div>
+  <div id="start"><div><strong>Tenochtitlan</strong><br>Zum Starten klicken<br><small>WASD zum Bewegen, Maus zum Umsehen</small></div></div>
+
+  <script type="module">
+    import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js";
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x9bc7d4);
+    scene.fog = new THREE.Fog(0x9bc7d4, 90, 260);
+
+    const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 500);
+    camera.position.set(0, 2, 18);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    document.body.appendChild(renderer.domElement);
+
+    scene.add(new THREE.HemisphereLight(0xcceeff, 0x66503a, 2));
+    const sun = new THREE.DirectionalLight(0xffe0a3, 3);
+    sun.position.set(-30, 60, 25);
+    sun.castShadow = true;
+    scene.add(sun);
+
+    const mat = (color) => new THREE.MeshStandardMaterial({ color, roughness: 0.9 });
+    const waterMat = mat(0x287d91), earthMat = mat(0xb6a078);
+    const stoneMat = mat(0xc4aa79), whiteMat = mat(0xd8c9a5);
+    const greenMat = mat(0x397448), roofMat = mat(0x9b5937);
+
+    function box(x, y, z, sx, sy, sz, material) {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), material);
+      m.position.set(x, y + sy / 2, z);
+      m.castShadow = true; m.receiveShadow = true; scene.add(m);
+      return m;
+    }
+
+    // Texcoco-See und zentrale Insel
+    box(0, -1.5, 0, 500, 1, 500, waterMat);
+    box(0, -0.3, 0, 100, 1.2, 100, earthMat);
+
+    // Kanäle, die das Viertel durchziehen
+    for (const x of [-34, 34]) box(x, 0.25, 0, 5, 0.12, 100, waterMat);
+    for (const z of [-34, 34]) box(0, 0.25, z, 100, 0.12, 5, waterMat);
+
+    // Tempelpyramide: gestufte Plattformen und Heiligtum
+    for (let i = 0; i < 5; i++) {
+      const size = 27 - i * 4.5;
+      const h = 2.3;
+      box(0, 0.3 + i * h, 0, size, h, size, stoneMat);
+    }
+    box(0, 11.8, 0, 10, 3, 10, whiteMat);
+    box(-2.5, 14.8, 0, 3, 3, 3, roofMat);
+    box( 2.5, 14.8, 0, 3, 3, 3, mat(0x526b49));
+
+    // Häuser in Blöcken rund um das zeremonielle Zentrum
+    for (let x = -42; x <= 42; x += 10) {
+      for (let z = -42; z <= 42; z += 10) {
+        if (Math.abs(x) < 15 && Math.abs(z) < 15) continue;
+        if (Math.abs(x) < 5 || Math.abs(z) < 5) continue;
+        const w = 4 + Math.random() * 2;
+        const h = 2 + Math.random() * 2.5;
+        box(x, 0.35, z, w, h, w, Math.random() > 0.5 ? whiteMat : roofMat);
+        box(x, 0.35 + h, z, w * 1.05, 0.35, w * 1.05, roofMat);
+      }
+    }
+
+    // Chinampas und einfache Bäume am Stadtrand
+    for (let i = 0; i < 34; i++) {
+      const x = (Math.random() - 0.5) * 180;
+      const z = (Math.random() - 0.5) * 180;
+      if (Math.abs(x) < 54 && Math.abs(z) < 54) continue;
+      box(x, -0.1, z, 5 + Math.random() * 5, 0.25, 5 + Math.random() * 5, greenMat);
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.28, 2, 6), mat(0x68452b));
+      trunk.position.set(x, 1, z); scene.add(trunk);
+      const crown = new THREE.Mesh(new THREE.SphereGeometry(1.2, 7, 6), greenMat);
+      crown.position.set(x, 2.3, z); crown.castShadow = true; scene.add(crown);
+    }
+
+    // Steuerung
+    const keys = {};
+    addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
+    addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
+    let yaw = 0, pitch = 0;
+    const start = document.querySelector("#start");
+    start.onclick = () => renderer.domElement.requestPointerLock();
+    document.addEventListener("pointerlockchange", () => {
+      start.style.display = document.pointerLockElement ? "none" : "grid";
+    });
+    document.addEventListener("mousemove", e => {
+      if (document.pointerLockElement !== renderer.domElement) return;
+      yaw -= e.movementX * 0.002;
+      pitch -= e.movementY * 0.002;
+      pitch = Math.max(-1.2, Math.min(1.2, pitch));
+    });
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const forward = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+      const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+      const speed = 0.18;
+      if (keys.w) camera.position.addScaledVector(forward, speed);
+      if (keys.s) camera.position.addScaledVector(forward, -speed);
+      if (keys.a) camera.position.addScaledVector(right, -speed);
+      if (keys.d) camera.position.addScaledVector(right, speed);
+      camera.position.y = 2;
+      camera.rotation.order = "YXZ";
+      camera.rotation.set(pitch, yaw, 0);
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    addEventListener("resize", () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+  </script>
+</body>
+</html>
